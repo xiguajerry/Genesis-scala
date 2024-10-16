@@ -3,5 +3,28 @@ package net.spartanb312.genesis
 import org.objectweb.asm.Opcodes
 
 def PUBLIC = Opcodes.ACC_PUBLIC
-
+def PRIVATE = Opcodes.ACC_PRIVATE
+def PROTECTED = Opcodes.ACC_PROTECTED
 def STATIC = Opcodes.ACC_STATIC
+def FINAL = Opcodes.ACC_FINAL
+def SUPER = Opcodes.ACC_SUPER
+def SYNCHRONIZED = Opcodes.ACC_SYNCHRONIZED
+def OPEN = Opcodes.ACC_OPEN
+def TRANSITIVE = Opcodes.ACC_TRANSITIVE
+def VOLATILE = Opcodes.ACC_VOLATILE
+def BRIDGE = Opcodes.ACC_BRIDGE
+def STATIC_PHASE = Opcodes.ACC_STATIC_PHASE
+def VARARGS = Opcodes.ACC_VARARGS
+def TRANSIENT = Opcodes.ACC_TRANSIENT
+def NATIVE = Opcodes.ACC_NATIVE
+def INTERFACE = Opcodes.ACC_INTERFACE
+def ABSTRACT = Opcodes.ACC_ABSTRACT
+def STRICT = Opcodes.ACC_STRICT
+def SYNTHETIC = Opcodes.ACC_SYNTHETIC
+def ANNOTATION = Opcodes.ACC_ANNOTATION
+def ENUM = Opcodes.ACC_ENUM
+def MANDATED = Opcodes.ACC_MANDATED
+def MODULE = Opcodes.ACC_MODULE
+
+def RECORD = Opcodes.ACC_RECORD
+def DEPRECATED = Opcodes.ACC_DEPRECATED
