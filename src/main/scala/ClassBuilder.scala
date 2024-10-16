@@ -21,6 +21,6 @@ def CLINIT(builder: MethodBuilder ?=> Unit)(using classBuilder: ClassBuilder): U
     val clinitMethod = clinit(builder)
     ~clinitMethod
 
-def CONSTRUCTOR(access: Int, description: String, signature: String = null, exception: Array[String] = null)(builder: MethodBuilder ?=> Unit)(using classBuilder: ClassBuilder): Unit =
+def CONSTRUCTOR(access: Access, description: String, signature: String = null, exception: Array[String] = null)(builder: MethodBuilder ?=> Unit)(using classBuilder: ClassBuilder): Unit =
     val constructorMethod = constructor(access, description, signature, exception)(builder)
     ~constructorMethod
