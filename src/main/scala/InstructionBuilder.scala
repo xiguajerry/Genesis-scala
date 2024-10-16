@@ -3,9 +3,23 @@ package net.spartanb312.genesis
 import org.objectweb.asm.*
 import org.objectweb.asm.tree.*
 
+import scala.collection.mutable
 import scala.compiletime.error
 
+class LabelRecorder:
+    private val map = mutable.Map[Any, Label]()
+
+    def apply(key: Any): Label =
+        if map.contains(key) then map(key)
+        else
+            val label = Label()
+            map.put(key, label)
+            label
+
+
 case class InstructionBuilder(insnList: InsnList):
+    val L = LabelRecorder()
+
     def +(insnList: InsnList): Unit = this.insnList.add(insnList)
 
     def +(insn: AbstractInsnNode): Unit = this.insnList.add(insn)
@@ -14,16 +28,52 @@ case class InstructionBuilder(insnList: InsnList):
         this.insnList.clear()
         this.insnList.add(insnList)
 
-extension(insn: AbstractInsnNode)
-    def unary_+(using insnBuilder: InstructionBuilder): Unit = insnBuilder + insn
 
-extension(insnList: InsnList)
-    def unary_+(using insnBuilder: InstructionBuilder): Unit = insnBuilder + insnList
-    def unary_~(using insnBuilder: InstructionBuilder): Unit = insnBuilder ~ insnList
-    def unary_+(using methodBuilder: MethodBuilder): Unit =
-        InstructionBuilder(methodBuilder.methodNode.instructions) + insnList
-    def unary_~(using methodBuilder: MethodBuilder): Unit =
-        InstructionBuilder(methodBuilder.methodNode.instructions) ~ insnList
+def L(key: Any)(using insnBuilder: InstructionBuilder): Label = insnBuilder.L(key)
+extension(ctx: StringContext) def L(args: Any*)(using insnBuilder: InstructionBuilder): Label =
+    insnBuilder.L(ctx.s(args*))
+
+
+def TRY(builder: InstructionBuilder ?=> Unit)(using insnBuilder: InstructionBuilder): TryCatchBuilder =
+    val tryBlock = instructions(builder)
+    val startLabel = L("EX_START" + System.currentTimeMillis())
+    val endLabel = L("EX_END" + System.currentTimeMillis() + 1000)
+    val tryCatchBuilder = TryCatchBuilder(startLabel, endLabel, tryBlock)
+    tryCatchBuilder
+
+
+case class TryCatchBuilder(startLabel: Label, var endLabel: Label, tryBlock: InsnList, handlers: mutable.Buffer[HandlerBlock] = mutable.Buffer()):
+    private var built = false
+
+    infix def CATCH(exception: String): TemporaryHandlerBlock =
+        if built then throw IllegalStateException("The try-catch statement has been built.")
+        TemporaryHandlerBlock(this, exception)
+
+    def unary_+(using insnBuilder: InstructionBuilder)(using methodBuilder: MethodBuilder): Unit =
+        if handlers.isEmpty then throw IllegalStateException("No catch blocks have been found.")
+        val finallyStart = L("EX_FINALLY" + System.currentTimeMillis() + 3000)
+        +startLabel
+        +tryBlock
+        +endLabel
+        GOTO(finallyStart)
+        handlers.foreach: handler =>
+            +handler.startLabel
+            +handler.handlerBlock
+            GOTO(finallyStart)
+            methodBuilder.methodNode.visitTryCatchBlock(startLabel, endLabel, handler.startLabel, handler.exception)
+        +finallyStart
+        built = true
+
+
+case class TemporaryHandlerBlock(tryCatchBuilder: TryCatchBuilder, exception: String):
+    infix def apply(builder: InstructionBuilder ?=> Unit)(using insnBuilder: InstructionBuilder): TryCatchBuilder =
+        val handlerBlock = instructions(builder)
+        val startLabel = L("HANDLER_START" + System.currentTimeMillis() + 2000)
+        tryCatchBuilder.handlers.addOne(HandlerBlock(startLabel, handlerBlock, exception))
+        tryCatchBuilder
+
+
+case class HandlerBlock(startLabel: Label, handlerBlock: InsnList, exception: String = "java/lang/Throwable")
 
 
 def instructions(builder: InstructionBuilder ?=> Unit): InsnList =
@@ -152,7 +202,7 @@ inline def LOR(using InstructionBuilder): Unit = +InsnNode(Opcodes.LOR)
 inline def IXOR(using InstructionBuilder): Unit = +InsnNode(Opcodes.IXOR)
 inline def LXOR(using InstructionBuilder): Unit = +InsnNode(Opcodes.LXOR)
 
-inline def IINC(index: Int)(incr: Int)(using InstructionBuilder): Unit = +IincInsnNode(index, incr)
+inline def IINC(index: Int, incr: Int)(using InstructionBuilder): Unit = +IincInsnNode(index, incr)
 
 inline def I2L(using InstructionBuilder): Unit = +InsnNode(Opcodes.I2L)
 inline def I2F(using InstructionBuilder): Unit = +InsnNode(Opcodes.I2F)
@@ -199,9 +249,9 @@ inline def JSR(label: LabelNode)(using InstructionBuilder): Unit = +JumpInsnNode
 
 inline def RET(index: Int)(using InstructionBuilder): Unit = +VarInsnNode(Opcodes.RET, index)
 
-inline def TABLESWITCH(range: Range)(default: LabelNode)(labels: LabelNode*)(using InstructionBuilder): Unit = +TableSwitchInsnNode(range.start, range.end, default, labels*)
+inline def TABLESWITCH(range: Range, default: LabelNode, labels: LabelNode*)(using InstructionBuilder): Unit = +TableSwitchInsnNode(range.start, range.end, default, labels*)
 inline def LOOKUPSWITCH(default: LabelNode)(keys: Int*)(labels: LabelNode*)(using InstructionBuilder): Unit = +LookupSwitchInsnNode(default, keys.toArray, labels.toArray)
-inline def LOOKUPSWITCH(default: LabelNode)(blocks: Map[Int, LabelNode])(using InstructionBuilder): Unit =
+inline def LOOKUPSWITCH(default: LabelNode, blocks: Map[Int, LabelNode])(using InstructionBuilder): Unit =
     LOOKUPSWITCH(default)(blocks.keys.toSeq*)(blocks.values.toSeq*)
 
 inline def IRETURN(using InstructionBuilder): Unit = +InsnNode(Opcodes.IRETURN)
@@ -211,17 +261,17 @@ inline def DRETURN(using InstructionBuilder): Unit = +InsnNode(Opcodes.DRETURN)
 inline def ARETURN(using InstructionBuilder): Unit = +InsnNode(Opcodes.ARETURN)
 inline def RETURN(using InstructionBuilder): Unit = +InsnNode(Opcodes.RETURN)
 
-inline def GETSTATIC(owner: String)(name: String)(desc: String)(using InstructionBuilder): Unit = +FieldInsnNode(Opcodes.GETSTATIC, owner, name, desc)
-inline def PUTSTATIC(owner: String)(name: String)(desc: String)(using InstructionBuilder): Unit = +FieldInsnNode(Opcodes.PUTSTATIC, owner, name, desc)
-inline def GETFIELD(owner: String)(name: String)(desc: String)(using InstructionBuilder): Unit = +FieldInsnNode(Opcodes.GETFIELD, owner, name, desc)
-inline def PUTFIELD(owner: String)(name: String)(desc: String)(using InstructionBuilder): Unit = +FieldInsnNode(Opcodes.PUTFIELD, owner, name, desc)
+inline def GETSTATIC(owner: String, name: String, desc: String)(using InstructionBuilder): Unit = +FieldInsnNode(Opcodes.GETSTATIC, owner, name, desc)
+inline def PUTSTATIC(owner: String, name: String, desc: String)(using InstructionBuilder): Unit = +FieldInsnNode(Opcodes.PUTSTATIC, owner, name, desc)
+inline def GETFIELD(owner: String, name: String, desc: String)(using InstructionBuilder): Unit = +FieldInsnNode(Opcodes.GETFIELD, owner, name, desc)
+inline def PUTFIELD(owner: String, name: String, desc: String)(using InstructionBuilder): Unit = +FieldInsnNode(Opcodes.PUTFIELD, owner, name, desc)
 
-inline def INVOKEVIRTUAL(owner: String)(name: String)(desc: String)(using InstructionBuilder) = +MethodInsnNode(Opcodes.INVOKEVIRTUAL, owner, name, desc)
-inline def INVOKESPECIAL(owner: String)(name: String)(desc: String)(using InstructionBuilder) = +MethodInsnNode(Opcodes.INVOKESPECIAL, owner, name, desc)
-inline def INVOKESTATIC(owner: String)(name: String)(desc: String)(using InstructionBuilder) = +MethodInsnNode(Opcodes.INVOKESTATIC, owner, name, desc)
-inline def INVOKEINTERFACE(owner: String)(name: String)(desc: String)(using InstructionBuilder) = +MethodInsnNode(Opcodes.INVOKEINTERFACE, owner, name, desc)
+inline def INVOKEVIRTUAL(owner: String, name: String, desc: String)(using InstructionBuilder) = +MethodInsnNode(Opcodes.INVOKEVIRTUAL, owner, name, desc)
+inline def INVOKESPECIAL(owner: String, name: String, desc: String)(using InstructionBuilder) = +MethodInsnNode(Opcodes.INVOKESPECIAL, owner, name, desc)
+inline def INVOKESTATIC(owner: String, name: String, desc: String)(using InstructionBuilder) = +MethodInsnNode(Opcodes.INVOKESTATIC, owner, name, desc)
+inline def INVOKEINTERFACE(owner: String, name: String, desc: String)(using InstructionBuilder) = +MethodInsnNode(Opcodes.INVOKEINTERFACE, owner, name, desc)
 
-inline def INVOKEDYNAMIC(name: String)(desc: String)(bsm: Handle)(bsmArgs: Any*)(using InstructionBuilder) = +InvokeDynamicInsnNode(name, desc, bsm, bsmArgs*)
+inline def INVOKEDYNAMIC(name: String, desc: String, bsm: Handle, bsmArgs: Any*)(using InstructionBuilder) = +InvokeDynamicInsnNode(name, desc, bsm, bsmArgs*)
 
 inline def NEW(name: String)(using InstructionBuilder): Unit = +TypeInsnNode(Opcodes.NEW, name)
 inline def ANEWARRAY(name: String)(using InstructionBuilder): Unit = +TypeInsnNode(Opcodes.ANEWARRAY, name)
@@ -236,7 +286,7 @@ inline def ATHROW(using InstructionBuilder): Unit = +InsnNode(Opcodes.ATHROW)
 inline def MONITORENTER(using InstructionBuilder): Unit = +InsnNode(Opcodes.MONITORENTER)
 inline def MONITOREXIT(using InstructionBuilder): Unit = +InsnNode(Opcodes.MONITOREXIT)
 
-inline def MULTIANEWARRAY(desc: String)(dimensions: Int)(using InstructionBuilder): Unit = +MultiANewArrayInsnNode(desc, dimensions)
+inline def MULTIANEWARRAY(desc: String, dimensions: Int)(using InstructionBuilder): Unit = +MultiANewArrayInsnNode(desc, dimensions)
 
 inline def IFNULL(label: LabelNode)(using InstructionBuilder): Unit = +JumpInsnNode(Opcodes.IFNULL, label)
 inline def IFNONNULL(label: LabelNode)(using InstructionBuilder): Unit = +JumpInsnNode(Opcodes.IFNONNULL, label)

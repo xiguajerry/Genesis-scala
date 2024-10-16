@@ -14,51 +14,74 @@ def INSTRUCTIONS(builder: InstructionBuilder ?=> Unit)(using methodBuilder: Meth
     builder
 
 
-def method(access: Int)(name: String)(desc: String)(signature: String = null)(exceptions: Array[String] = null)(builder: MethodBuilder ?=> Unit): MethodNode =
-    val methodNode = MethodNode(access, name, desc, signature, exceptions)
+def method(access: Int, name: String, description: String, signature: String = null, exceptions: Array[String] = null)(builder: MethodBuilder ?=> Unit): MethodNode =
+    val methodNode = MethodNode(access, name, description, signature, exceptions)
     given MethodBuilder(methodNode)
     builder
     methodNode
 
-//extension(insnList: InsnList)
-
+def clinit(builder: MethodBuilder ?=> Unit): MethodNode =
+    val methodNode = MethodNode(PUBLIC + STATIC, "<clinit>", "()V", null, null)
+    given MethodBuilder(methodNode)
+    builder
+    methodNode
+    
+def constructor(access: Int, description: String, signature: String, exception: Array[String] = null)(builder: MethodBuilder ?=> Unit): MethodNode =
+    val methodNode = MethodNode(access, "<init>", description, signature, exception)
+    given MethodBuilder(methodNode)
+    builder
+    methodNode
 
 
 @main
 def main(): Unit =
-    val methodNode = method(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC)("main")("([Ljava/lang/String;)V")(null)(null):
-        INSTRUCTIONS:
-            val labelA = Label()
-            val labelB = Label()
-            val labelC = Label()
-            val labelD = Label()
+    val classNode1 = clazz(PUBLIC + STATIC, "Main"):
+        CLINIT:
+            INSTRUCTIONS:
+                GETSTATIC("java/lang/System", "out", "Ljava/io/PrintStream;")
+                LDC("CLINIT")
+                INVOKEVIRTUAL("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
+                RETURN
 
-            ICONST_1
-            TABLESWITCH(1 to 2)(labelA)(labelB, labelC)
-            LABEL(labelA)
-            GOTO(labelD)
+        CONSTRUCTOR(PUBLIC, "()V"):
+            INSTRUCTIONS:
+                ALOAD(0)
+                INVOKESPECIAL("java/lang/Object", "<init>", "()V")
+                GETSTATIC("java/lang/System", "out", "Ljava/io/PrintStream;")
+                LDC("Hello 1")
+                INVOKEVIRTUAL("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
+                RETURN
 
-            LABEL(labelB)
-            GETSTATIC("java/lang/System")("out")("Ljava/io/PrintStream;")
-            LDC("Hello 1")
-            INVOKEVIRTUAL("java/io/PrintStream")("println")("(Ljava/lang/String;)V")
-            GOTO(labelD)
+        +method(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null):
+            INSTRUCTIONS:
 
-            LABEL(labelC)
-            GOTO(labelD)
+                +(TRY {
+                    ICONST_1
+                    TABLESWITCH(1 to 2, L"labelA", L"labelB", L"labelC")
+                    LABEL(L"labelA")
+                    GOTO(L"labelD")
 
-            LABEL(labelD)
-            GETSTATIC("java/lang/System")("out")("Ljava/io/PrintStream;")
-            LDC("End")
-            INVOKEVIRTUAL("java/io/PrintStream")("println")("(Ljava/lang/String;)V")
-            RETURN
+                    LABEL(L"labelB")
+                    GETSTATIC("java/lang/System", "out", "Ljava/io/PrintStream;")
+                    LDC("Hello 1")
+                    INVOKEVIRTUAL("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
+                    GOTO(L"labelD")
 
-    val classNode = ClassNode()
-    classNode.name = "Main"
-    classNode.superName = "java/lang/Object"
-    classNode.methods = List(methodNode).asJava
-    classNode.version = Opcodes.V1_8
+                    LABEL(L"labelC")
+                    GOTO(L"labelD")
+
+                    LABEL(L"labelD")
+                    GETSTATIC("java/lang/System", "out", "Ljava/io/PrintStream;")
+                    LDC("End")
+                    INVOKEVIRTUAL("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
+                } CATCH ("java/lang/Exception") apply {
+                    POP
+                    GETSTATIC("java/lang/System", "out", "Ljava/io/PrintStream;")
+                    LDC("Exception")
+                    INVOKEVIRTUAL("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
+                })
+                RETURN
 
     val writer = ClassWriter(ClassWriter.COMPUTE_FRAMES)
-    classNode.accept(writer)
+    classNode1.accept(writer)
     FileOutputStream("D:\\Main.class").write(writer.toByteArray)
