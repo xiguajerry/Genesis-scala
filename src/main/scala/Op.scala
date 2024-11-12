@@ -1,4 +1,4 @@
-package net.spartanb312.genesis
+package net.spartanb312.genesis.scala
 
 import org.objectweb.asm.tree.{AbstractInsnNode, InsnList, MethodNode}
 import scala.jdk.CollectionConverters.*

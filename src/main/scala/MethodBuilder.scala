@@ -1,9 +1,10 @@
-package net.spartanb312.genesis
+package net.spartanb312.genesis.scala
 
 import org.objectweb.asm.{ClassWriter, Label, Opcodes}
 import org.objectweb.asm.tree.{ClassNode, InsnList, MethodNode}
 
 import java.io.{File, FileOutputStream, FileWriter}
+import scala.compiletime.error
 import scala.jdk.CollectionConverters.*
 
 
@@ -41,8 +42,20 @@ transparent inline def MethodNode(access: Access, name: String, description: Str
     org.objectweb.asm.tree.MethodNode(access.toInt, name, description, signature, exceptions)
 
 
+inline def foo() = if (fib(28) != 317811) error("")
+
 @main
 def main(): Unit =
+    foo()
+    println(fib(1))
+    println(fib(2))
+    println(fib(3))
+    println(fib(4))
+    println(fib(5))
+    println(fib(6))
+    println(fib(7))
+    println(fib(16))
+    println(fib(28))
     val classNode1 = clazz(PUBLIC | STATIC, "Main"):
         CLINIT:
             INSTRUCTIONS:
@@ -60,7 +73,7 @@ def main(): Unit =
                 INVOKEVIRTUAL("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
                 RETURN
 
-        +method(PUBLIC | STATIC, "main", "([Ljava/lang/String;)V", null, null):
+        +method(PUBLIC | STATIC, "main", "([Ljava/lang/String;)V"):
             INSTRUCTIONS:
 
                 +(TRY {

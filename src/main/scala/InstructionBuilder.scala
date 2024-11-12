@@ -1,4 +1,4 @@
-package net.spartanb312.genesis
+package net.spartanb312.genesis.scala
 
 import org.objectweb.asm.*
 import org.objectweb.asm.tree.*
@@ -30,8 +30,9 @@ case class InstructionBuilder(insnList: InsnList):
 
 
 def L(key: Any)(using insnBuilder: InstructionBuilder): Label = insnBuilder.L(key)
-extension(ctx: StringContext) def L(args: Any*)(using insnBuilder: InstructionBuilder): Label =
-    insnBuilder.L(ctx.s(args*))
+
+extension(ctx: StringContext)
+    def L(args: Any*)(using insnBuilder: InstructionBuilder): Label = insnBuilder.L(ctx.s(args*))
 
 
 def TRY(builder: InstructionBuilder ?=> Unit)(using insnBuilder: InstructionBuilder): TryCatchBuilder =

@@ -5,7 +5,10 @@ ThisBuild / scalaVersion := "3.5.1"
 lazy val root = (project in file("."))
     .settings(
         name := "genesis-scala",
-        idePackagePrefix := Some("net.spartanb312.genesis"),
+        idePackagePrefix := Some("net.spartanb312.genesis.scala"),
+        scalacOptions ++= Seq(
+            "-Xmax-inlines", "1024"
+        )
     )
 
 libraryDependencies ++= Seq(

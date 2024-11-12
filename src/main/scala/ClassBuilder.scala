@@ -1,7 +1,9 @@
-package net.spartanb312.genesis
+package net.spartanb312.genesis.scala
 
 import org.objectweb.asm.tree.{ClassNode, MethodNode}
+
 import scala.jdk.CollectionConverters.*
+import scala.quoted.{Expr, Quotes}
 
 case class ClassBuilder(classNode: ClassNode)
 
@@ -24,3 +26,14 @@ def CLINIT(builder: MethodBuilder ?=> Unit)(using classBuilder: ClassBuilder): U
 def CONSTRUCTOR(access: Access, description: String, signature: String = null, exception: Array[String] = null)(builder: MethodBuilder ?=> Unit)(using classBuilder: ClassBuilder): Unit =
     val constructorMethod = constructor(access, description, signature, exception)(builder)
     ~constructorMethod
+
+
+//def foo(): 1 = fib(1)
+//def bar1(): 2 = fib(3)
+//def bar2(): 4 = fib(4)
+
+inline def fib(i: Int) = ${ fibCode('i) }
+
+def fibCode(n: Expr[Int])(using Quotes): Expr[Int] = n.valueOrAbort match
+    case 1 | 2 => '{ 1 }
+    case v => Expr(fibCode(Expr(v - 1)).valueOrAbort + fibCode(Expr(v - 2)).valueOrAbort)
